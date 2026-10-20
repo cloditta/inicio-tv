@@ -1,5 +1,7 @@
 package es.marta.inicio;
 
+import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -8,8 +10,11 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
+import android.graphics.Outline;
 import android.graphics.Paint;
-import android.graphics.RectF;
+import android.graphics.Shader;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -21,6 +26,8 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewOutlineProvider;
+import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
 import android.widget.HorizontalScrollView;
@@ -34,14 +41,16 @@ import android.widget.Toast;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 /**
- * Pantalla de inicio minimalista: fondo rotativo, dock de favoritas abajo
- * y una vista con todas las aplicaciones. Sin dependencias externas.
+ * Pantalla de inicio minimalista: fondo rotativo con zoom lento, saludo y hora,
+ * dock traslucido con tarjetas de las apps y una vista con todas las aplicaciones.
+ * Sin dependencias externas.
  */
 public class MainActivity extends Activity {
 
@@ -63,26 +72,19 @@ public class MainActivity extends Activity {
     private static final String PAQUETE_TV = "com.mediatek.wwtv.tvcenter";
     private static final String PAQUETE_AJUSTES = "com.android.tv.settings";
 
-    /** Degradados de respaldo con aire de naturaleza (si no hay fotos). */
-    private static final int[][] DEGRADADOS = {
-            {0xFF0B3D2E, 0xFF2E7D5B, 0xFF9BC53D},   // bosque
-            {0xFF0A2540, 0xFF1F6F8B, 0xFF99D5C9},   // lago
-            {0xFF2B1B3D, 0xFF8E4162, 0xFFF2A65A},   // atardecer
-            {0xFF10261F, 0xFF3C6E57, 0xFFC7D9B7},   // niebla
-            {0xFF1B2A41, 0xFF324A5F, 0xFFCCC9DC},   // montana
-    };
-
     private PackageManager pm;
     private final Handler h = new Handler(Looper.getMainLooper());
 
     private FrameLayout root;
     private ImageView bgA;
     private ImageView bgB;
+    private final ObjectAnimator[] zoom = new ObjectAnimator[2];
     private boolean frenteEsA = true;
     private boolean hayFondo = false;
     private int indiceFondo = 0;
-    private int indiceDegradado = 0;
+    private int indicePaisaje = 0;
 
+    private TextView saludo;
     private LinearLayout dock;
     private HorizontalScrollView dockScroll;
     private TextView etiqueta;
@@ -104,7 +106,6 @@ public class MainActivity extends Activity {
 
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
-        root.setClipChildren(false);
 
         bgA = vistaFondo();
         bgB = vistaFondo();
@@ -112,64 +113,108 @@ public class MainActivity extends Activity {
         root.addView(bgA);
         root.addView(bgB);
 
-        // Degradado oscuro inferior para que el dock se lea sobre cualquier foto.
+        // Sombreado arriba (para la hora) y abajo (para el dock).
         View velo = new View(this);
         velo.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x00000000, 0xB3000000}));
+                new int[]{0x00000000, 0xCC000000}));
         root.addView(velo, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(320), Gravity.BOTTOM));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(360), Gravity.BOTTOM));
+        View veloArriba = new View(this);
+        veloArriba.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x99000000, 0x00000000}));
+        root.addView(veloArriba, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(240), Gravity.TOP));
+
+        // Saludo, hora y fecha arriba a la izquierda.
+        LinearLayout cabecera = new LinearLayout(this);
+        cabecera.setOrientation(LinearLayout.VERTICAL);
+
+        saludo = new TextView(this);
+        saludo.setTextColor(0xB3FFFFFF);
+        saludo.setTextSize(13);
+        saludo.setLetterSpacing(0.25f);
+        saludo.setShadowLayer(6, 0, 2, 0x99000000);
+        cabecera.addView(saludo);
 
         TextClock reloj = new TextClock(this);
         reloj.setFormat24Hour("HH:mm");
         reloj.setFormat12Hour("HH:mm");
         reloj.setTextColor(Color.WHITE);
-        reloj.setTextSize(30);
-        reloj.setShadowLayer(8, 0, 2, 0xAA000000);
-        FrameLayout.LayoutParams rp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.END);
-        rp.setMargins(0, dp(36), dp(56), 0);
-        root.addView(reloj, rp);
+        reloj.setTextSize(64);
+        reloj.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
+        reloj.setIncludeFontPadding(false);
+        reloj.setShadowLayer(10, 0, 3, 0x88000000);
+        cabecera.addView(reloj);
 
+        TextClock fecha = new TextClock(this);
+        fecha.setFormat24Hour("EEEE, d 'de' MMMM");
+        fecha.setFormat12Hour("EEEE, d 'de' MMMM");
+        fecha.setTextColor(0xCCFFFFFF);
+        fecha.setTextSize(18);
+        fecha.setShadowLayer(6, 0, 2, 0x99000000);
+        cabecera.addView(fecha);
+
+        FrameLayout.LayoutParams cabeceraLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.START);
+        cabeceraLp.setMargins(dp(72), dp(44), 0, 0);
+        root.addView(cabecera, cabeceraLp);
+
+        // Dock: barra traslucida con scroll horizontal.
         dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
-        dock.setGravity(Gravity.CENTER);
-        dock.setClipChildren(false);
-        dock.setPadding(dp(24), dp(20), dp(24), dp(20));
+        dock.setGravity(Gravity.CENTER_VERTICAL);
+        dock.setPadding(dp(16), dp(14), dp(16), dp(14));
 
-        // El dock va dentro de un scroll horizontal: si hay mas apps de las que
-        // caben, el mando las alcanza igualmente y el dock se desplaza solo.
+        GradientDrawable barra = new GradientDrawable();
+        barra.setColor(0x59101216);
+        barra.setCornerRadius(dp(30));
+        barra.setStroke(dp(1), 0x26FFFFFF);
+
         dockScroll = new HorizontalScrollView(this);
         dockScroll.setHorizontalScrollBarEnabled(false);
         dockScroll.setFillViewport(true);
-        dockScroll.setClipChildren(false);
+        dockScroll.setBackground(barra);
+        dockScroll.setClipToOutline(true);
         dockScroll.addView(dock, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         FrameLayout.LayoutParams dockLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
-        dockLp.setMargins(0, 0, 0, dp(64));
+        dockLp.setMargins(dp(56), 0, dp(56), dp(44));
         root.addView(dockScroll, dockLp);
 
-        // Nombre de la app seleccionada, una sola linea bajo el dock.
+        // Nombre de la app seleccionada, encima del dock y alineado a la izquierda.
         etiqueta = new TextView(this);
         etiqueta.setTextColor(Color.WHITE);
-        etiqueta.setTextSize(20);
-        etiqueta.setGravity(Gravity.CENTER);
+        etiqueta.setTextSize(26);
+        etiqueta.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         etiqueta.setShadowLayer(8, 0, 2, 0xCC000000);
         FrameLayout.LayoutParams etiquetaLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM);
-        etiquetaLp.setMargins(0, 0, 0, dp(28));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.START);
+        etiquetaLp.setMargins(dp(84), 0, 0, dp(176));
         root.addView(etiqueta, etiquetaLp);
 
+        // Vista de todas las apps.
+        LinearLayout columna = new LinearLayout(this);
+        columna.setOrientation(LinearLayout.VERTICAL);
+        TextView titulo = new TextView(this);
+        titulo.setText("Todas las apps");
+        titulo.setTextColor(Color.WHITE);
+        titulo.setTextSize(28);
+        titulo.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
+        titulo.setPadding(dp(14), 0, 0, dp(18));
+        columna.addView(titulo);
         rejilla = new GridLayout(this);
-        rejilla.setColumnCount(6);
-        rejilla.setClipChildren(false);
+        rejilla.setColumnCount(5);
+        columna.addView(rejilla);
+
         overlay = new ScrollView(this);
-        overlay.setBackgroundColor(0xE6000000);
-        overlay.setPadding(dp(72), dp(56), dp(72), dp(56));
-        overlay.addView(rejilla);
+        overlay.setBackgroundColor(0xEE0E1014);
+        overlay.setPadding(dp(64), dp(48), dp(64), dp(48));
+        overlay.setClipToPadding(false);
+        overlay.addView(columna);
         overlay.setVisibility(View.GONE);
         root.addView(overlay, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -180,6 +225,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        actualizarSaludo();
         construirDock();
         h.removeCallbacks(rotar);
         if (!hayFondo) {
@@ -209,6 +255,21 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void actualizarSaludo() {
+        int hora = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        String s;
+        if (hora < 6) {
+            s = "BUENAS NOCHES";
+        } else if (hora < 13) {
+            s = "BUENOS DÍAS";
+        } else if (hora < 21) {
+            s = "BUENAS TARDES";
+        } else {
+            s = "BUENAS NOCHES";
+        }
+        saludo.setText(s);
+    }
+
     // ------------------------------------------------------------------ dock
 
     private void construirDock() {
@@ -218,26 +279,26 @@ public class MainActivity extends Activity {
                 continue;
             }
             final String pkg = f[1];
-            dock.addView(item(f[0], icono(pkg), false, new Runnable() {
+            dock.addView(item(f[0], tileDe(pkg), false, new Runnable() {
                 @Override
                 public void run() {
                     abrir(pkg);
                 }
             }));
         }
-        dock.addView(item("TV en directo", icono(PAQUETE_TV), false, new Runnable() {
+        dock.addView(item("TV en directo", panel(icono(PAQUETE_TV)), false, new Runnable() {
             @Override
             public void run() {
                 abrirTv();
             }
         }));
-        dock.addView(item("Ajustes", icono(PAQUETE_AJUSTES), false, new Runnable() {
+        dock.addView(item("Ajustes", panel(icono(PAQUETE_AJUSTES)), false, new Runnable() {
             @Override
             public void run() {
                 startSeguro(new Intent(Settings.ACTION_SETTINGS));
             }
         }));
-        dock.addView(item("Todas las apps", iconoApps(), false, new Runnable() {
+        dock.addView(item("Todas las apps", tileApps(), false, new Runnable() {
             @Override
             public void run() {
                 mostrarApps();
@@ -248,49 +309,62 @@ public class MainActivity extends Activity {
         }
     }
 
-    private View item(String texto, Drawable icono, boolean etiquetaSiempre, final Runnable accion) {
+    /**
+     * Tarjeta con esquinas redondeadas. En el dock el nombre se muestra encima de la barra
+     * al seleccionarla; en la vista de todas las apps va siempre bajo la tarjeta.
+     */
+    private View item(final String texto, Drawable tile, final boolean grid, final Runnable accion) {
         final LinearLayout col = new LinearLayout(this);
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_HORIZONTAL);
         col.setFocusable(true);
         col.setClickable(true);
-        col.setClipChildren(false);
-        int pad = etiquetaSiempre ? dp(14) : dp(6);
-        col.setPadding(pad, dp(10), pad, dp(10));
+        col.setPadding(dp(7), dp(10), dp(7), dp(10));
 
+        int anchoTile = grid ? 136 : 128;
+        int altoTile = grid ? 76 : 72;
+
+        final FrameLayout caja = new FrameLayout(this);
         ImageView iv = new ImageView(this);
-        iv.setImageDrawable(icono);
-        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        int lado = etiquetaSiempre ? dp(88) : dp(72);
-        col.addView(iv, new LinearLayout.LayoutParams(lado, lado));
+        iv.setImageDrawable(tile);
+        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        iv.setClipToOutline(true);
+        iv.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View v, Outline outline) {
+                outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(14));
+            }
+        });
+        caja.addView(iv, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        col.addView(caja, new LinearLayout.LayoutParams(dp(anchoTile), dp(altoTile)));
 
-        final TextView tv = new TextView(this);
-        tv.setText(texto);
-        tv.setTextColor(Color.WHITE);
-        tv.setTextSize(15);
-        tv.setGravity(Gravity.CENTER);
-        tv.setSingleLine(true);
-        tv.setShadowLayer(6, 0, 2, 0xCC000000);
-        tv.setAlpha(etiquetaSiempre ? 1f : 0f);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
-                dp(120), ViewGroup.LayoutParams.WRAP_CONTENT);
-        tp.topMargin = dp(8);
-        if (etiquetaSiempre) {
+        if (grid) {
+            TextView tv = new TextView(this);
+            tv.setText(texto);
+            tv.setTextColor(0xE6FFFFFF);
+            tv.setTextSize(14);
+            tv.setGravity(Gravity.CENTER);
+            tv.setSingleLine(true);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
+                    dp(anchoTile + 12), ViewGroup.LayoutParams.WRAP_CONTENT);
+            tp.topMargin = dp(8);
             col.addView(tv, tp);
         }
 
-        final GradientDrawable foco = new GradientDrawable();
-        foco.setColor(0x33FFFFFF);
-        foco.setCornerRadius(dp(20));
-        final boolean siempre = etiquetaSiempre;
+        // Aro blanco al seleccionar.
+        final GradientDrawable aro = new GradientDrawable();
+        aro.setColor(Color.TRANSPARENT);
+        aro.setStroke(dp(3), Color.WHITE);
+        aro.setCornerRadius(dp(14));
 
         col.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean tiene) {
-                v.animate().scaleX(tiene ? 1.16f : 1f).scaleY(tiene ? 1.16f : 1f)
-                        .setDuration(140).start();
-                v.setBackground(tiene ? foco : null);
-                if (!siempre && tiene) {
+                float escala = tiene ? (grid ? 1.1f : 1.08f) : 1f;
+                v.animate().scaleX(escala).scaleY(escala).setDuration(140).start();
+                caja.setForeground(tiene ? aro : null);
+                if (!grid && tiene) {
                     etiqueta.setText(texto);
                 }
             }
@@ -329,7 +403,7 @@ public class MainActivity extends Activity {
         });
         for (ResolveInfo ri : lista) {
             final String pkg = ri.activityInfo.packageName;
-            rejilla.addView(item(ri.loadLabel(pm).toString(), ri.loadIcon(pm), true, new Runnable() {
+            rejilla.addView(item(ri.loadLabel(pm).toString(), tileDe(ri), true, new Runnable() {
                 @Override
                 public void run() {
                     abrir(pkg);
@@ -409,7 +483,7 @@ public class MainActivity extends Activity {
 
     /**
      * Fotos en: /sdcard/Android/data/es.marta.inicio/files/fondos
-     * Si la carpeta esta vacia se usan degradados.
+     * Si la carpeta esta vacia se generan paisajes de montanas.
      */
     private void siguienteFondo() {
         File dir = getExternalFilesDir("fondos");
@@ -424,7 +498,19 @@ public class MainActivity extends Activity {
             });
         }
         if (fotos == null || fotos.length == 0) {
-            mostrar(degradado());
+            final int estilo = indicePaisaje++ % Paisaje.ESTILOS;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    final Bitmap b = Paisaje.crear(1280, 720, estilo, System.nanoTime());
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            mostrar(new BitmapDrawable(getResources(), b));
+                        }
+                    });
+                }
+            }).start();
             return;
         }
         Arrays.sort(fotos);
@@ -459,22 +545,54 @@ public class MainActivity extends Activity {
         return BitmapFactory.decodeFile(f.getPath(), o);
     }
 
-    private Drawable degradado() {
-        int[] colores = DEGRADADOS[indiceDegradado++ % DEGRADADOS.length];
-        return new GradientDrawable(GradientDrawable.Orientation.TL_BR, colores);
-    }
-
+    /** Fundido entre fondos y zoom lento (efecto Ken Burns) sobre el que entra. */
     private void mostrar(Drawable d) {
         hayFondo = true;
         ImageView frente = frenteEsA ? bgA : bgB;
         ImageView atras = frenteEsA ? bgB : bgA;
+        int idx = frenteEsA ? 1 : 0;
+        if (zoom[idx] != null) {
+            zoom[idx].cancel();
+        }
+        atras.setScaleX(1f);
+        atras.setScaleY(1f);
         atras.setImageDrawable(d);
         atras.animate().alpha(1f).setDuration(1500).start();
         frente.animate().alpha(0f).setDuration(1500).start();
+
+        ObjectAnimator z = ObjectAnimator.ofPropertyValuesHolder(atras,
+                PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.07f),
+                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.07f));
+        z.setDuration(ROTAR_MS + 3000);
+        z.setInterpolator(new LinearInterpolator());
+        z.start();
+        zoom[idx] = z;
         frenteEsA = !frenteEsA;
     }
 
-    // --------------------------------------------------------------- iconos
+    // --------------------------------------------------------------- tarjetas
+
+    /** Banner de la app (como en el launcher de Android TV) o, si no tiene, su icono sobre un panel. */
+    private Drawable tileDe(String pkg) {
+        Drawable banner = null;
+        try {
+            Intent li = pm.getLeanbackLaunchIntentForPackage(pkg);
+            if (li != null) {
+                banner = pm.getActivityBanner(li);
+            }
+            if (banner == null) {
+                banner = pm.getApplicationBanner(pkg);
+            }
+        } catch (Exception e) {
+            banner = null;
+        }
+        return banner != null ? banner : panel(icono(pkg));
+    }
+
+    private Drawable tileDe(ResolveInfo ri) {
+        Drawable banner = ri.activityInfo.loadBanner(pm);
+        return banner != null ? banner : panel(ri.loadIcon(pm));
+    }
 
     private Drawable icono(String pkg) {
         try {
@@ -484,17 +602,39 @@ public class MainActivity extends Activity {
         }
     }
 
-    private Drawable iconoApps() {
-        int s = 256;
-        Bitmap b = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888);
+    /** Fondo oscuro 16:9 con el icono en el centro. */
+    private Drawable panel(Drawable icono) {
+        int w = 320;
+        int hh = 180;
+        Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0x55FFFFFF);
-        c.drawRoundRect(new RectF(0, 0, s, s), 56, 56, p);
+        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF3A3F4B, 0xFF1E2128,
+                Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, hh, p);
+        int s = 96;
+        int l = (w - s) / 2;
+        int t = (hh - s) / 2;
+        icono.setBounds(l, t, l + s, t + s);
+        icono.draw(c);
+        return new BitmapDrawable(getResources(), b);
+    }
+
+    /** Tarjeta de "Todas las apps": nueve puntos sobre el mismo panel. */
+    private Drawable tileApps() {
+        int w = 320;
+        int hh = 180;
+        Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF3A3F4B, 0xFF1E2128,
+                Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, hh, p);
+        p.setShader(null);
         p.setColor(Color.WHITE);
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                c.drawCircle(64 + i * 64, 64 + j * 64, 16, p);
+                c.drawCircle(w / 2f - 40 + i * 40, hh / 2f - 40 + j * 40, 11, p);
             }
         }
         return new BitmapDrawable(getResources(), b);
