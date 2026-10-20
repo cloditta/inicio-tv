@@ -27,6 +27,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
+import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
@@ -48,8 +49,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Pantalla de inicio minimalista: fondo rotativo con zoom lento, saludo y hora,
- * dock traslucido con tarjetas de las apps y una vista con todas las aplicaciones.
+ * Pantalla de inicio minimalista estilo Apple TV: fondo rotativo con zoom lento,
+ * saludo y hora, dock traslucido con tarjetas de las apps y vista de todas las aplicaciones.
  * Sin dependencias externas.
  */
 public class MainActivity extends Activity {
@@ -57,7 +58,7 @@ public class MainActivity extends Activity {
     /** Cada cuanto cambia el fondo. */
     private static final long ROTAR_MS = 5 * 60 * 1000L;
 
-    /** Orden del dock. Si una app no esta instalada, se omite. */
+    /** Orden del dock (despues de TV en directo). Si una app no esta instalada, se omite. */
     private static final String[][] FAVORITAS = {
             {"Netflix", "com.netflix.ninja"},
             {"YouTube", "com.google.android.youtube.tv"},
@@ -74,6 +75,7 @@ public class MainActivity extends Activity {
 
     private PackageManager pm;
     private final Handler h = new Handler(Looper.getMainLooper());
+    private final DecelerateInterpolator suavizado = new DecelerateInterpolator();
 
     private FrameLayout root;
     private ImageView bgA;
@@ -113,26 +115,28 @@ public class MainActivity extends Activity {
         root.addView(bgA);
         root.addView(bgB);
 
-        // Sombreado arriba (para la hora) y abajo (para el dock).
+        // Degradados suaves arriba y abajo para dar contraste sin tapar el paisaje.
         View velo = new View(this);
         velo.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x00000000, 0xCC000000}));
+                new int[]{0x00000000, 0xB3000000}));
         root.addView(velo, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(360), Gravity.BOTTOM));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(340), Gravity.BOTTOM));
+
         View veloArriba = new View(this);
         veloArriba.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x99000000, 0x00000000}));
+                new int[]{0x80000000, 0x00000000}));
         root.addView(veloArriba, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(240), Gravity.TOP));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(220), Gravity.TOP));
 
-        // Saludo, hora y fecha arriba a la izquierda.
+        // Saludo, hora y fecha arriba a la izquierda (estilo minimalista).
         LinearLayout cabecera = new LinearLayout(this);
         cabecera.setOrientation(LinearLayout.VERTICAL);
 
         saludo = new TextView(this);
         saludo.setTextColor(0xB3FFFFFF);
-        saludo.setTextSize(13);
-        saludo.setLetterSpacing(0.25f);
+        saludo.setTextSize(12);
+        saludo.setLetterSpacing(0.28f);
+        saludo.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         saludo.setShadowLayer(6, 0, 2, 0x99000000);
         cabecera.addView(saludo);
 
@@ -140,78 +144,92 @@ public class MainActivity extends Activity {
         reloj.setFormat24Hour("HH:mm");
         reloj.setFormat12Hour("HH:mm");
         reloj.setTextColor(Color.WHITE);
-        reloj.setTextSize(64);
+        reloj.setTextSize(62);
         reloj.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         reloj.setIncludeFontPadding(false);
-        reloj.setShadowLayer(10, 0, 3, 0x88000000);
+        reloj.setShadowLayer(12, 0, 3, 0x80000000);
         cabecera.addView(reloj);
 
         TextClock fecha = new TextClock(this);
         fecha.setFormat24Hour("EEEE, d 'de' MMMM");
         fecha.setFormat12Hour("EEEE, d 'de' MMMM");
-        fecha.setTextColor(0xCCFFFFFF);
-        fecha.setTextSize(18);
+        fecha.setTextColor(0xD9FFFFFF);
+        fecha.setTextSize(17);
+        fecha.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         fecha.setShadowLayer(6, 0, 2, 0x99000000);
         cabecera.addView(fecha);
 
         FrameLayout.LayoutParams cabeceraLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP | Gravity.START);
-        cabeceraLp.setMargins(dp(72), dp(44), 0, 0);
+        cabeceraLp.setMargins(dp(64), dp(42), 0, 0);
         root.addView(cabecera, cabeceraLp);
 
-        // Dock: barra traslucida con scroll horizontal.
+        // Dock estilo Apple TV: capsula flotante traslucida con espacio para el zoom de las tarjetas.
         dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER_VERTICAL);
-        dock.setPadding(dp(16), dp(14), dp(16), dp(14));
+        dock.setPadding(dp(22), dp(18), dp(22), dp(18));
+        dock.setClipChildren(false);
+        dock.setClipToPadding(false);
 
         GradientDrawable barra = new GradientDrawable();
-        barra.setColor(0x59101216);
-        barra.setCornerRadius(dp(30));
-        barra.setStroke(dp(1), 0x26FFFFFF);
+        barra.setColor(0x45101218);
+        barra.setCornerRadius(dp(34));
+        barra.setStroke(dp(1), 0x38FFFFFF);
 
         dockScroll = new HorizontalScrollView(this);
         dockScroll.setHorizontalScrollBarEnabled(false);
         dockScroll.setFillViewport(true);
         dockScroll.setBackground(barra);
         dockScroll.setClipToOutline(true);
+        dockScroll.setClipChildren(false);
+        dockScroll.setClipToPadding(false);
+        dockScroll.setElevation(dp(8));
         dockScroll.addView(dock, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
         FrameLayout.LayoutParams dockLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
-        dockLp.setMargins(dp(56), 0, dp(56), dp(44));
+        dockLp.setMargins(dp(52), 0, dp(52), dp(40));
         root.addView(dockScroll, dockLp);
 
-        // Nombre de la app seleccionada, encima del dock y alineado a la izquierda.
+        // Nombre de la app seleccionada, flotando encima del dock.
         etiqueta = new TextView(this);
         etiqueta.setTextColor(Color.WHITE);
-        etiqueta.setTextSize(26);
+        etiqueta.setTextSize(24);
+        etiqueta.setLetterSpacing(0.02f);
         etiqueta.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        etiqueta.setShadowLayer(8, 0, 2, 0xCC000000);
+        etiqueta.setShadowLayer(10, 0, 3, 0xCC000000);
         FrameLayout.LayoutParams etiquetaLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.START);
-        etiquetaLp.setMargins(dp(84), 0, 0, dp(176));
+        etiquetaLp.setMargins(dp(80), 0, 0, dp(186));
         root.addView(etiqueta, etiquetaLp);
 
         // Vista de todas las apps.
         LinearLayout columna = new LinearLayout(this);
         columna.setOrientation(LinearLayout.VERTICAL);
+        columna.setClipChildren(false);
+        columna.setClipToPadding(false);
+
         TextView titulo = new TextView(this);
-        titulo.setText("Todas las apps");
+        titulo.setText("Todas las aplicaciones");
         titulo.setTextColor(Color.WHITE);
         titulo.setTextSize(28);
         titulo.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        titulo.setPadding(dp(14), 0, 0, dp(18));
+        titulo.setPadding(dp(12), 0, 0, dp(20));
         columna.addView(titulo);
+
         rejilla = new GridLayout(this);
         rejilla.setColumnCount(5);
+        rejilla.setClipChildren(false);
+        rejilla.setClipToPadding(false);
         columna.addView(rejilla);
 
         overlay = new ScrollView(this);
-        overlay.setBackgroundColor(0xEE0E1014);
+        overlay.setBackgroundColor(0xEB0B0D12);
         overlay.setPadding(dp(64), dp(48), dp(64), dp(48));
         overlay.setClipToPadding(false);
         overlay.addView(columna);
@@ -274,6 +292,16 @@ public class MainActivity extends Activity {
 
     private void construirDock() {
         dock.removeAllViews();
+
+        // 1. TV en directo siempre en la primera posicion del dock.
+        dock.addView(item("TV en directo", tileDe(PAQUETE_TV), false, new Runnable() {
+            @Override
+            public void run() {
+                abrirTv();
+            }
+        }));
+
+        // 2. Aplicaciones favoritas en el orden definido.
         for (final String[] f : FAVORITAS) {
             if (!instalada(f[1])) {
                 continue;
@@ -286,12 +314,8 @@ public class MainActivity extends Activity {
                 }
             }));
         }
-        dock.addView(item("TV en directo", panel(icono(PAQUETE_TV)), false, new Runnable() {
-            @Override
-            public void run() {
-                abrirTv();
-            }
-        }));
+
+        // 3. Ajustes y Todas las apps al final.
         dock.addView(item("Ajustes", panel(icono(PAQUETE_AJUSTES)), false, new Runnable() {
             @Override
             public void run() {
@@ -304,14 +328,14 @@ public class MainActivity extends Activity {
                 mostrarApps();
             }
         }));
+
         if (getCurrentFocus() == null && dock.getChildCount() > 0) {
             dock.getChildAt(0).requestFocus();
         }
     }
 
     /**
-     * Tarjeta con esquinas redondeadas. En el dock el nombre se muestra encima de la barra
-     * al seleccionarla; en la vista de todas las apps va siempre bajo la tarjeta.
+     * Tarjeta estilo tvOS con esquinas redondeadas de 18dp, sombra y zoom fluido al recibir el foco.
      */
     private View item(final String texto, Drawable tile, final boolean grid, final Runnable accion) {
         final LinearLayout col = new LinearLayout(this);
@@ -319,22 +343,28 @@ public class MainActivity extends Activity {
         col.setGravity(Gravity.CENTER_HORIZONTAL);
         col.setFocusable(true);
         col.setClickable(true);
-        col.setPadding(dp(7), dp(10), dp(7), dp(10));
+        col.setClipChildren(false);
+        col.setClipToPadding(false);
+        col.setPadding(dp(9), dp(8), dp(9), dp(8));
 
-        int anchoTile = grid ? 136 : 128;
-        int altoTile = grid ? 76 : 72;
+        int anchoTile = grid ? 148 : 144;
+        int altoTile = grid ? 83 : 81;
+        final int radio = dp(18);
 
         final FrameLayout caja = new FrameLayout(this);
-        ImageView iv = new ImageView(this);
-        iv.setImageDrawable(tile);
-        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        iv.setClipToOutline(true);
-        iv.setOutlineProvider(new ViewOutlineProvider() {
+        caja.setElevation(dp(3));
+        caja.setOutlineProvider(new ViewOutlineProvider() {
             @Override
             public void getOutline(View v, Outline outline) {
-                outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), dp(14));
+                outline.setRoundRect(0, 0, v.getWidth(), v.getHeight(), radio);
             }
         });
+        caja.setClipToOutline(true);
+
+        final ImageView iv = new ImageView(this);
+        iv.setImageDrawable(tile);
+        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        iv.setAlpha(0.86f);
         caja.addView(iv, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         col.addView(caja, new LinearLayout.LayoutParams(dp(anchoTile), dp(altoTile)));
@@ -348,21 +378,29 @@ public class MainActivity extends Activity {
             tv.setSingleLine(true);
             LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
                     dp(anchoTile + 12), ViewGroup.LayoutParams.WRAP_CONTENT);
-            tp.topMargin = dp(8);
+            tp.topMargin = dp(10);
             col.addView(tv, tp);
         }
 
-        // Aro blanco al seleccionar.
+        // Aro blanco nitido estilo Apple TV al seleccionar.
         final GradientDrawable aro = new GradientDrawable();
         aro.setColor(Color.TRANSPARENT);
         aro.setStroke(dp(3), Color.WHITE);
-        aro.setCornerRadius(dp(14));
+        aro.setCornerRadius(radio);
 
         col.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean tiene) {
-                float escala = tiene ? (grid ? 1.1f : 1.08f) : 1f;
-                v.animate().scaleX(escala).scaleY(escala).setDuration(140).start();
+                float escala = tiene ? (grid ? 1.10f : 1.13f) : 1f;
+                v.animate()
+                        .scaleX(escala)
+                        .scaleY(escala)
+                        .translationZ(tiene ? dp(12) : 0f)
+                        .setInterpolator(suavizado)
+                        .setDuration(160)
+                        .start();
+                iv.setAlpha(tiene ? 1f : 0.86f);
+                caja.setElevation(tiene ? dp(10) : dp(3));
                 caja.setForeground(tiene ? aro : null);
                 if (!grid && tiene) {
                     etiqueta.setText(texto);
@@ -602,17 +640,17 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Fondo oscuro 16:9 con el icono en el centro. */
+    /** Fondo oscuro elegante 16:9 con el icono en el centro. */
     private Drawable panel(Drawable icono) {
         int w = 320;
         int hh = 180;
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF3A3F4B, 0xFF1E2128,
+        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF2C303A, 0xFF15181E,
                 Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, hh, p);
-        int s = 96;
+        int s = 92;
         int l = (w - s) / 2;
         int t = (hh - s) / 2;
         icono.setBounds(l, t, l + s, t + s);
@@ -620,21 +658,23 @@ public class MainActivity extends Activity {
         return new BitmapDrawable(getResources(), b);
     }
 
-    /** Tarjeta de "Todas las apps": nueve puntos sobre el mismo panel. */
+    /** Tarjeta de "Todas las apps": icono minimalista estilo rejilla de tvOS. */
     private Drawable tileApps() {
         int w = 320;
         int hh = 180;
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF3A3F4B, 0xFF1E2128,
+        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF2C303A, 0xFF15181E,
                 Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, hh, p);
         p.setShader(null);
-        p.setColor(Color.WHITE);
+        p.setColor(0xE6FFFFFF);
         for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                c.drawCircle(w / 2f - 40 + i * 40, hh / 2f - 40 + j * 40, 11, p);
+            for (int j = 0; j < 2; j++) {
+                float left = w / 2f - 46 + i * 34;
+                float top = hh / 2f - 22 + j * 28;
+                c.drawRoundRect(left, top, left + 24, top + 16, 4, 4, p);
             }
         }
         return new BitmapDrawable(getResources(), b);
