@@ -23,6 +23,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.GridLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -83,6 +84,8 @@ public class MainActivity extends Activity {
     private int indiceDegradado = 0;
 
     private LinearLayout dock;
+    private HorizontalScrollView dockScroll;
+    private TextView etiqueta;
     private ScrollView overlay;
     private GridLayout rejilla;
 
@@ -132,11 +135,33 @@ public class MainActivity extends Activity {
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER);
         dock.setClipChildren(false);
+        dock.setPadding(dp(24), dp(20), dp(24), dp(20));
+
+        // El dock va dentro de un scroll horizontal: si hay mas apps de las que
+        // caben, el mando las alcanza igualmente y el dock se desplaza solo.
+        dockScroll = new HorizontalScrollView(this);
+        dockScroll.setHorizontalScrollBarEnabled(false);
+        dockScroll.setFillViewport(true);
+        dockScroll.setClipChildren(false);
+        dockScroll.addView(dock, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         FrameLayout.LayoutParams dockLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
-        dockLp.setMargins(0, 0, 0, dp(44));
-        root.addView(dock, dockLp);
+        dockLp.setMargins(0, 0, 0, dp(64));
+        root.addView(dockScroll, dockLp);
+
+        // Nombre de la app seleccionada, una sola linea bajo el dock.
+        etiqueta = new TextView(this);
+        etiqueta.setTextColor(Color.WHITE);
+        etiqueta.setTextSize(20);
+        etiqueta.setGravity(Gravity.CENTER);
+        etiqueta.setShadowLayer(8, 0, 2, 0xCC000000);
+        FrameLayout.LayoutParams etiquetaLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM);
+        etiquetaLp.setMargins(0, 0, 0, dp(28));
+        root.addView(etiqueta, etiquetaLp);
 
         rejilla = new GridLayout(this);
         rejilla.setColumnCount(6);
@@ -230,12 +255,14 @@ public class MainActivity extends Activity {
         col.setFocusable(true);
         col.setClickable(true);
         col.setClipChildren(false);
-        col.setPadding(dp(14), dp(12), dp(14), dp(10));
+        int pad = etiquetaSiempre ? dp(14) : dp(6);
+        col.setPadding(pad, dp(10), pad, dp(10));
 
         ImageView iv = new ImageView(this);
         iv.setImageDrawable(icono);
         iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        col.addView(iv, new LinearLayout.LayoutParams(dp(88), dp(88)));
+        int lado = etiquetaSiempre ? dp(88) : dp(72);
+        col.addView(iv, new LinearLayout.LayoutParams(lado, lado));
 
         final TextView tv = new TextView(this);
         tv.setText(texto);
@@ -248,7 +275,9 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
                 dp(120), ViewGroup.LayoutParams.WRAP_CONTENT);
         tp.topMargin = dp(8);
-        col.addView(tv, tp);
+        if (etiquetaSiempre) {
+            col.addView(tv, tp);
+        }
 
         final GradientDrawable foco = new GradientDrawable();
         foco.setColor(0x33FFFFFF);
@@ -261,8 +290,8 @@ public class MainActivity extends Activity {
                 v.animate().scaleX(tiene ? 1.16f : 1f).scaleY(tiene ? 1.16f : 1f)
                         .setDuration(140).start();
                 v.setBackground(tiene ? foco : null);
-                if (!siempre) {
-                    tv.animate().alpha(tiene ? 1f : 0f).setDuration(140).start();
+                if (!siempre && tiene) {
+                    etiqueta.setText(texto);
                 }
             }
         });
@@ -308,6 +337,7 @@ public class MainActivity extends Activity {
             }));
         }
         overlay.setVisibility(View.VISIBLE);
+        etiqueta.setVisibility(View.GONE);
         overlay.scrollTo(0, 0);
         if (rejilla.getChildCount() > 0) {
             rejilla.getChildAt(0).requestFocus();
@@ -317,6 +347,7 @@ public class MainActivity extends Activity {
     private void cerrarApps() {
         if (overlay.getVisibility() == View.VISIBLE) {
             overlay.setVisibility(View.GONE);
+            etiqueta.setVisibility(View.VISIBLE);
             if (dock.getChildCount() > 0) {
                 dock.getChildAt(0).requestFocus();
             }
