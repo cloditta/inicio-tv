@@ -50,7 +50,7 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
 
-    private static final long ROTAR_MS = 5 * 60 * 1000L;
+    private static final long ROTAR_MS = 5 * 60 * 1000L; // 5 minutos exactos
 
     private static final String[][] FAVORITAS = {
             {"Netflix", "com.netflix.ninja"},
@@ -68,7 +68,7 @@ public class MainActivity extends Activity {
 
     private PackageManager pm;
     private final Handler h = new Handler(Looper.getMainLooper());
-    private final OvershootInterpolator rebote = new OvershootInterpolator(1.2f); // Fisica de resorte Apple
+    private final OvershootInterpolator rebote = new OvershootInterpolator(1.2f);
 
     private FrameLayout root;
     private ImageView bgA;
@@ -124,7 +124,7 @@ public class MainActivity extends Activity {
         cabecera.setOrientation(LinearLayout.VERTICAL);
 
         saludo = new TextView(this);
-        saludo.setTextColor(0x99FFFFFF); // 60% opacidad, minimalista
+        saludo.setTextColor(0x99FFFFFF);
         saludo.setTextSize(12);
         saludo.setLetterSpacing(0.35f);
         saludo.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
@@ -136,7 +136,7 @@ public class MainActivity extends Activity {
         reloj.setFormat12Hour("HH:mm");
         reloj.setTextColor(Color.WHITE);
         reloj.setTextSize(68);
-        reloj.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL)); // Fuente ultra fina tvOS
+        reloj.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
         reloj.setIncludeFontPadding(false);
         reloj.setShadowLayer(10, 0, 4, 0x80000000);
         
@@ -168,7 +168,7 @@ public class MainActivity extends Activity {
         dock.setClipToPadding(false);
 
         GradientDrawable barra = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x551C1E26, 0x660A0B0E}); // Falso cristal esmerilado HD
+                new int[]{0x551C1E26, 0x660A0B0E});
         barra.setCornerRadius(dp(36));
         barra.setStroke(dp(1), 0x26FFFFFF);
 
@@ -347,7 +347,7 @@ public class MainActivity extends Activity {
 
         final GradientDrawable aro = new GradientDrawable();
         aro.setColor(Color.TRANSPARENT);
-        aro.setStroke(dp(2), Color.WHITE); // Borde ultra fino Apple TV
+        aro.setStroke(dp(2), Color.WHITE);
         aro.setCornerRadius(radio);
 
         col.setOnFocusChangeListener(new View.OnFocusChangeListener() {
@@ -358,7 +358,7 @@ public class MainActivity extends Activity {
                         .scaleX(escala)
                         .scaleY(escala)
                         .translationZ(tiene ? dp(16) : 0f)
-                        .setInterpolator(rebote) // Rebote Apple
+                        .setInterpolator(rebote)
                         .setDuration(300)
                         .start();
                 iv.setAlpha(tiene ? 1f : 0.85f);
@@ -402,6 +402,7 @@ public class MainActivity extends Activity {
         }
         overlay.setVisibility(View.VISIBLE);
         etiqueta.setVisibility(View.GONE);
+        dockScroll.setVisibility(View.GONE); // OCULTA EL DOCK AL ABRIR APPS
         overlay.scrollTo(0, 0);
         if (rejilla.getChildCount() > 0) rejilla.getChildAt(0).requestFocus();
     }
@@ -410,6 +411,7 @@ public class MainActivity extends Activity {
         if (overlay.getVisibility() == View.VISIBLE) {
             overlay.setVisibility(View.GONE);
             etiqueta.setVisibility(View.VISIBLE);
+            dockScroll.setVisibility(View.VISIBLE); // MUESTRA EL DOCK AL CERRAR APPS
             if (dock.getChildCount() > 0) dock.getChildAt(0).requestFocus();
         }
     }
