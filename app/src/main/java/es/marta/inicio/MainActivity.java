@@ -15,7 +15,6 @@ import android.graphics.LinearGradient;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.RadialGradient;
 import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
@@ -50,7 +49,6 @@ import android.widget.Toast;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -59,14 +57,7 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
 
-    private static final long ROTAR_MS = 5 * 60 * 1000L; // 5 minutos exactos
-
-    // Paleta Aesthetic (Dark & Warm Champagne Gold)
-    private static final int COLOR_GOLD = 0xFFF3E5AB;        // Dorado suave luminoso
-    private static final int COLOR_GOLD_GLOW = 0x66D4AF37;   // Resplandor dorado
-    private static final int COLOR_GOLD_BORDER = 0x40F3E5AB; // Borde sutil dorado
-    private static final int COLOR_GLASS_TOP = 0xCC16181F;   // Cristal oscuro superior
-    private static final int COLOR_GLASS_BOT = 0xE60B0C10;   // Cristal oscuro inferior
+    private static final long ROTAR_MS = 5 * 60 * 1000L; // 5 minutos
 
     private static final String[][] FAVORITAS = {
             {"Netflix", "com.netflix.ninja"},
@@ -84,7 +75,7 @@ public class MainActivity extends Activity {
 
     private PackageManager pm;
     private final Handler h = new Handler(Looper.getMainLooper());
-    private final OvershootInterpolator rebote = new OvershootInterpolator(1.15f);
+    private final OvershootInterpolator rebote = new OvershootInterpolator(1.1f);
     private final DecelerateInterpolator suave = new DecelerateInterpolator(1.5f);
 
     private FrameLayout root;
@@ -96,7 +87,6 @@ public class MainActivity extends Activity {
     private int indiceFondo = 0;
     private int indicePaisaje = 0;
 
-    private TextView saludo;
     private LinearLayout dock;
     private HorizontalScrollView dockScroll;
     private TextView etiqueta;
@@ -119,7 +109,7 @@ public class MainActivity extends Activity {
         pm = getPackageManager();
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(0xFF07080A);
+        root.setBackgroundColor(Color.BLACK);
 
         bgA = vistaFondo();
         bgB = vistaFondo();
@@ -127,144 +117,107 @@ public class MainActivity extends Activity {
         root.addView(bgA);
         root.addView(bgB);
 
-        // Velo inferior más alto y suave para fundir el dock con elegancia
+        // Velo inferior sutil para dar contraste limpio al dock estilo tvOS
         View velo = new View(this);
         velo.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x00000000, 0x88050608, 0xEC050608}));
+                new int[]{0x00000000, 0x4D000000, 0x99000000}));
         root.addView(velo, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(380), Gravity.BOTTOM));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(320), Gravity.BOTTOM));
 
-        // Velo superior sutil para lectura perfecta del reloj
+        // Velo superior ligero
         View veloArriba = new View(this);
         veloArriba.setBackground(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0x99050608, 0x00000000}));
+                new int[]{0x66000000, 0x00000000}));
         root.addView(veloArriba, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(240), Gravity.TOP));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(160), Gravity.TOP));
 
-        // --- CABECERA AESTHETIC ---
+        // --- CABECERA MINIMALISTA ESTILO APPLE TV (Arriba a la derecha) ---
         LinearLayout cabecera = new LinearLayout(this);
         cabecera.setOrientation(LinearLayout.VERTICAL);
-
-        saludo = new TextView(this);
-        saludo.setTextColor(COLOR_GOLD);
-        saludo.setTextSize(11);
-        saludo.setLetterSpacing(0.42f);
-        saludo.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        saludo.setShadowLayer(8, 0, 2, 0xCC000000);
-        cabecera.addView(saludo);
+        cabecera.setGravity(Gravity.END);
 
         TextClock reloj = new TextClock(this);
         reloj.setFormat24Hour("HH:mm");
         reloj.setFormat12Hour("HH:mm");
-        reloj.setTextColor(0xFFFDFBF7);
-        reloj.setTextSize(76);
-        reloj.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
+        reloj.setTextColor(0xF2FFFFFF);
+        reloj.setTextSize(44);
+        reloj.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         reloj.setIncludeFontPadding(false);
-        reloj.setShadowLayer(16, 0, 6, 0x99000000);
-
-        LinearLayout.LayoutParams relojLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        relojLp.topMargin = dp(-6);
-        cabecera.addView(reloj, relojLp);
-
-        // Pequeña línea divisoria dorada minimalista
-        View lineaOro = new View(this);
-        GradientDrawable gdLinea = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{COLOR_GOLD, 0x00F3E5AB});
-        gdLinea.setCornerRadius(dp(1));
-        lineaOro.setBackground(gdLinea);
-        LinearLayout.LayoutParams lineaLp = new LinearLayout.LayoutParams(dp(48), dp(2));
-        lineaLp.topMargin = dp(6);
-        lineaLp.bottomMargin = dp(8);
-        cabecera.addView(lineaOro, lineaLp);
+        reloj.setShadowLayer(12, 0, 3, 0x66000000);
+        cabecera.addView(reloj);
 
         TextClock fecha = new TextClock(this);
-        fecha.setFormat24Hour("EEEE, d 'de' MMMM");
-        fecha.setFormat12Hour("EEEE, d 'de' MMMM");
-        fecha.setTextColor(0xD9FFFFFF);
-        fecha.setTextSize(15);
-        fecha.setLetterSpacing(0.04f);
-        fecha.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        fecha.setShadowLayer(6, 0, 2, 0x99000000);
+        fecha.setFormat24Hour("EEEE, d MMM");
+        fecha.setFormat12Hour("EEEE, d MMM");
+        fecha.setTextColor(0xB3FFFFFF);
+        fecha.setTextSize(14);
+        fecha.setLetterSpacing(0.02f);
+        fecha.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        fecha.setShadowLayer(8, 0, 2, 0x66000000);
         cabecera.addView(fecha);
 
         FrameLayout.LayoutParams cabeceraLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.TOP | Gravity.START);
-        cabeceraLp.setMargins(dp(64), dp(44), 0, 0);
+                Gravity.TOP | Gravity.END);
+        cabeceraLp.setMargins(0, dp(40), dp(58), 0);
         root.addView(cabecera, cabeceraLp);
 
-        // --- DOCK GLASSMORPHISM ---
+        // --- DOCK CRISTAL TRASLÚCIDO (tvOS Frosted Glass) ---
         dock = new LinearLayout(this);
         dock.setOrientation(LinearLayout.HORIZONTAL);
         dock.setGravity(Gravity.CENTER_VERTICAL);
-        dock.setPadding(dp(24), dp(20), dp(24), dp(20));
+        dock.setPadding(dp(26), dp(22), dp(26), dp(22));
         dock.setClipChildren(false);
         dock.setClipToPadding(false);
 
         GradientDrawable barra = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{COLOR_GLASS_TOP, COLOR_GLASS_BOT});
-        barra.setCornerRadius(dp(32));
-        barra.setStroke(dp(1), COLOR_GOLD_BORDER);
+                new int[]{0x33FFFFFF, 0x1AFFFFFF});
+        barra.setCornerRadius(dp(38));
+        barra.setStroke(dp(1), 0x40FFFFFF);
 
         dockScroll = new HorizontalScrollView(this);
         dockScroll.setHorizontalScrollBarEnabled(false);
-        dockScroll.setFillViewport(true);
+        dockScroll.setFillViewport(false);
         dockScroll.setBackground(barra);
         dockScroll.setClipToOutline(true);
         dockScroll.setClipChildren(false);
         dockScroll.setClipToPadding(false);
-        dockScroll.setElevation(dp(16));
+        dockScroll.setElevation(dp(20));
         dockScroll.addView(dock, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         FrameLayout.LayoutParams dockLp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM);
-        dockLp.setMargins(dp(56), 0, dp(56), dp(38));
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        dockLp.setMargins(dp(48), 0, dp(48), dp(38));
         root.addView(dockScroll, dockLp);
 
-        // --- ETIQUETA FLOTANTE (PILL) ---
+        // --- ETIQUETA DE APP LIMPIA ---
         etiqueta = new TextView(this);
-        etiqueta.setTextColor(COLOR_GOLD);
-        etiqueta.setTextSize(15);
-        etiqueta.setLetterSpacing(0.06f);
-        etiqueta.setPadding(dp(18), dp(7), dp(18), dp(7));
+        etiqueta.setTextColor(Color.WHITE);
+        etiqueta.setTextSize(20);
+        etiqueta.setLetterSpacing(0.01f);
         etiqueta.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-
-        GradientDrawable fondoEtiqueta = new GradientDrawable();
-        fondoEtiqueta.setColor(0xD90E1015);
-        fondoEtiqueta.setCornerRadius(dp(20));
-        fondoEtiqueta.setStroke(dp(1), 0x4DF3E5AB);
-        etiqueta.setBackground(fondoEtiqueta);
-        etiqueta.setElevation(dp(8));
-
+        etiqueta.setShadowLayer(10, 0, 3, 0x99000000);
         FrameLayout.LayoutParams etiquetaLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.START);
-        etiquetaLp.setMargins(dp(72), 0, 0, dp(178));
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        etiquetaLp.setMargins(0, 0, 0, dp(192));
         root.addView(etiqueta, etiquetaLp);
 
-        // --- OVERLAY TODAS LAS APPS ---
+        // --- CAJÓN DE APLICACIONES ESTILO tvOS ---
         LinearLayout columna = new LinearLayout(this);
         columna.setOrientation(LinearLayout.VERTICAL);
+        columna.setGravity(Gravity.CENTER_HORIZONTAL);
         columna.setClipChildren(false);
         columna.setClipToPadding(false);
 
-        TextView subtituloApps = new TextView(this);
-        subtituloApps.setText("BIBLIOTECA");
-        subtituloApps.setTextColor(COLOR_GOLD);
-        subtituloApps.setTextSize(11);
-        subtituloApps.setLetterSpacing(0.35f);
-        subtituloApps.setPadding(dp(12), 0, 0, dp(4));
-        columna.addView(subtituloApps);
-
         TextView titulo = new TextView(this);
-        titulo.setText("Todas las aplicaciones");
+        titulo.setText("Aplicaciones");
         titulo.setTextColor(Color.WHITE);
-        titulo.setTextSize(28);
-        titulo.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
-        titulo.setPadding(dp(12), 0, 0, dp(24));
+        titulo.setTextSize(26);
+        titulo.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        titulo.setPadding(0, 0, 0, dp(28));
         columna.addView(titulo);
 
         rejilla = new GridLayout(this);
@@ -274,15 +227,15 @@ public class MainActivity extends Activity {
         columna.addView(rejilla);
 
         overlay = new ScrollView(this);
-        overlay.setBackgroundColor(0xF208090C);
-        overlay.setPadding(dp(64), dp(48), dp(64), dp(48));
+        overlay.setBackgroundColor(0xE6121317);
+        overlay.setPadding(dp(56), dp(48), dp(56), dp(48));
         overlay.setClipToPadding(false);
         overlay.addView(columna);
         overlay.setVisibility(View.GONE);
         root.addView(overlay, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        // --- OVERLAY SELECTOR HDMI ---
+        // --- SELECTOR HDMI MINIMALISTA ---
         construirOverlayHdmi();
 
         setContentView(root);
@@ -291,7 +244,6 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        actualizarSaludo();
         construirDock();
         h.removeCallbacks(rotar);
         if (!hayFondo) {
@@ -326,24 +278,14 @@ public class MainActivity extends Activity {
         cerrarApps();
     }
 
-    private void actualizarSaludo() {
-        int hora = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-        String s;
-        if (hora < 6) s = "BUENAS NOCHES · MARTA";
-        else if (hora < 13) s = "BUENOS DÍAS · MARTA";
-        else if (hora < 21) s = "BUENAS TARDES · MARTA";
-        else s = "BUENAS NOCHES · MARTA";
-        saludo.setText(s);
-    }
-
     private void construirDock() {
         dock.removeAllViews();
+
         dock.addView(item("TV en directo", tileDe(PAQUETE_TV), false, new Runnable() {
             @Override
             public void run() { abrirTv(); }
         }));
 
-        // Nuevo botón selector de entradas HDMI
         dock.addView(item("Entradas HDMI", tileHdmi(), false, new Runnable() {
             @Override
             public void run() { mostrarSelectorHdmi(); }
@@ -357,21 +299,26 @@ public class MainActivity extends Activity {
                 public void run() { abrir(pkg); }
             }));
         }
-        dock.addView(item("Ajustes", panel(icono(PAQUETE_AJUSTES)), false, new Runnable() {
-            @Override
-            public void run() { startSeguro(new Intent(Settings.ACTION_SETTINGS)); }
-        }));
+
         dock.addView(item("Todas las apps", tileApps(), false, new Runnable() {
             @Override
             public void run() { mostrarApps(); }
         }));
-        if (getCurrentFocus() == null && dock.getChildCount() > 0) dock.getChildAt(0).requestFocus();
+
+        dock.addView(item("Ajustes", panel(icono(PAQUETE_AJUSTES)), false, new Runnable() {
+            @Override
+            public void run() { startSeguro(new Intent(Settings.ACTION_SETTINGS)); }
+        }));
+
+        if (getCurrentFocus() == null && dock.getChildCount() > 0) {
+            dock.getChildAt(0).requestFocus();
+        }
     }
 
-    // --- SISTEMA DE PUERTOS HDMI ---
+    // --- PANEL MODAL DE ENTRADAS HDMI ESTILO APPLE TV ---
     private void construirOverlayHdmi() {
         overlayHdmi = new FrameLayout(this);
-        overlayHdmi.setBackgroundColor(0xD9050608);
+        overlayHdmi.setBackgroundColor(0xB3000000);
         overlayHdmi.setVisibility(View.GONE);
 
         LinearLayout tarjeta = new LinearLayout(this);
@@ -381,30 +328,22 @@ public class MainActivity extends Activity {
         tarjeta.setClipChildren(false);
         tarjeta.setClipToPadding(false);
 
+        // Cristal translúcido estilo tvOS
         GradientDrawable fondoModal = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xF5191B22, 0xFA0E1015});
-        fondoModal.setCornerRadius(dp(28));
-        fondoModal.setStroke(dp(1), COLOR_GOLD_BORDER);
+                new int[]{0xEE26282E, 0xEE181A1F});
+        fondoModal.setCornerRadius(dp(32));
+        fondoModal.setStroke(dp(1), 0x38FFFFFF);
         tarjeta.setBackground(fondoModal);
         tarjeta.setElevation(dp(24));
 
-        TextView sub = new TextView(this);
-        sub.setText("SEÑAL DE VÍDEO");
-        sub.setTextColor(COLOR_GOLD);
-        sub.setTextSize(11);
-        sub.setLetterSpacing(0.35f);
-        sub.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        tarjeta.addView(sub);
-
         TextView tit = new TextView(this);
-        tit.setText("Seleccionar entrada HDMI");
+        tit.setText("Entradas de vídeo");
         tit.setTextColor(Color.WHITE);
-        tit.setTextSize(24);
-        tit.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
+        tit.setTextSize(22);
+        tit.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         LinearLayout.LayoutParams titLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        titLp.topMargin = dp(4);
-        titLp.bottomMargin = dp(28);
+        titLp.bottomMargin = dp(26);
         tarjeta.addView(tit, titLp);
 
         contenedorHdmi = new LinearLayout(this);
@@ -425,8 +364,7 @@ public class MainActivity extends Activity {
     private void mostrarSelectorHdmi() {
         contenedorHdmi.removeAllViews();
 
-        // 1. Añadir acceso a TV en directo / TDT
-        contenedorHdmi.addView(crearTarjetaPuerto("TV / Antena", "Sintonizador", true, new Runnable() {
+        contenedorHdmi.addView(crearTarjetaPuerto("TV", "Antena", true, new Runnable() {
             @Override
             public void run() {
                 cerrarHdmi();
@@ -434,7 +372,6 @@ public class MainActivity extends Activity {
             }
         }));
 
-        // 2. Detectar entradas reales con TvInputManager (HDMI físicos)
         boolean encontrados = false;
         try {
             TvInputManager tim = (TvInputManager) getSystemService(Context.TV_INPUT_SERVICE);
@@ -460,7 +397,7 @@ public class MainActivity extends Activity {
                     String nombre = (label != null && label.length() > 0) ? label.toString() : "HDMI";
                     int estado = tim.getInputState(info.getId());
                     boolean activo = (estado == TvInputManager.INPUT_STATE_CONNECTED);
-                    String sub = activo ? "Conectado" : "Puerto disponible";
+                    String sub = activo ? "Conectado" : "Disponible";
 
                     contenedorHdmi.addView(crearTarjetaPuerto(nombre, sub, activo, new Runnable() {
                         @Override
@@ -473,11 +410,10 @@ public class MainActivity extends Activity {
             }
         } catch (Exception ignored) {}
 
-        // 3. Fallback estético (HDMI 1, 2, 3) si el sistema oculta la lista a apps de usuario
         if (!encontrados) {
             for (int i = 1; i <= 3; i++) {
                 final int num = i;
-                contenedorHdmi.addView(crearTarjetaPuerto("HDMI " + num, "Puerto " + num, false, new Runnable() {
+                contenedorHdmi.addView(crearTarjetaPuerto("HDMI " + num, "Entrada " + num, false, new Runnable() {
                     @Override
                     public void run() {
                         cerrarHdmi();
@@ -489,12 +425,12 @@ public class MainActivity extends Activity {
 
         overlayHdmi.setAlpha(0f);
         overlayHdmi.setVisibility(View.VISIBLE);
-        overlayHdmi.animate().alpha(1f).setDuration(220).setInterpolator(suave).start();
+        overlayHdmi.animate().alpha(1f).setDuration(200).setInterpolator(suave).start();
         etiqueta.setVisibility(View.GONE);
         dockScroll.setVisibility(View.GONE);
 
         if (contenedorHdmi.getChildCount() > 1) {
-            contenedorHdmi.getChildAt(1).requestFocus(); // Enfoca el primer HDMI por defecto
+            contenedorHdmi.getChildAt(1).requestFocus();
         } else if (contenedorHdmi.getChildCount() > 0) {
             contenedorHdmi.getChildAt(0).requestFocus();
         }
@@ -506,25 +442,26 @@ public class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER);
         card.setFocusable(true);
         card.setClickable(true);
-        card.setPadding(dp(22), dp(22), dp(22), dp(20));
+        card.setPadding(dp(20), dp(20), dp(20), dp(18));
 
-        final GradientDrawable bgNormal = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF22252E, 0xFF13151B});
-        bgNormal.setCornerRadius(dp(20));
+        final GradientDrawable bgNormal = new GradientDrawable();
+        bgNormal.setColor(0x22FFFFFF);
+        bgNormal.setCornerRadius(dp(22));
         bgNormal.setStroke(dp(1), 0x26FFFFFF);
 
-        final GradientDrawable bgFoco = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{0xFF2C2F3A, 0xFF191B22});
-        bgFoco.setCornerRadius(dp(20));
-        bgFoco.setStroke(dp(2), COLOR_GOLD);
+        final GradientDrawable bgFoco = new GradientDrawable();
+        bgFoco.setColor(0xF2FFFFFF);
+        bgFoco.setCornerRadius(dp(22));
 
         card.setBackground(bgNormal);
         card.setElevation(dp(6));
 
-        ImageView icono = new ImageView(this);
-        icono.setImageDrawable(dibujarIconoConector(conectado));
-        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(56), dp(36));
-        iconLp.bottomMargin = dp(12);
+        final ImageView icono = new ImageView(this);
+        final Drawable iconBlanco = dibujarIconoConector(Color.WHITE);
+        final Drawable iconOscuro = dibujarIconoConector(0xFF141519);
+        icono.setImageDrawable(iconBlanco);
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(54), dp(34));
+        iconLp.bottomMargin = dp(10);
         card.addView(icono, iconLp);
 
         final TextView tvTit = new TextView(this);
@@ -537,21 +474,24 @@ public class MainActivity extends Activity {
 
         final TextView tvSub = new TextView(this);
         tvSub.setText(subtitulo);
-        tvSub.setTextColor(conectado ? COLOR_GOLD : 0x88FFFFFF);
+        tvSub.setTextColor(conectado ? 0xCCFFFFFF : 0x80FFFFFF);
         tvSub.setTextSize(12);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        subLp.topMargin = dp(3);
+        subLp.topMargin = dp(2);
         card.addView(tvSub, subLp);
 
+        // En tvOS, la tarjeta seleccionada se ilumina en blanco puro con texto oscuro
         card.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean tiene) {
-                float s = tiene ? 1.10f : 1.0f;
-                v.animate().scaleX(s).scaleY(s).translationZ(tiene ? dp(12) : 0f)
-                        .setInterpolator(rebote).setDuration(260).start();
+                float s = tiene ? 1.12f : 1.0f;
+                v.animate().scaleX(s).scaleY(s).translationZ(tiene ? dp(16) : 0f)
+                        .setInterpolator(rebote).setDuration(240).start();
                 card.setBackground(tiene ? bgFoco : bgNormal);
-                tvTit.setTextColor(tiene ? COLOR_GOLD : Color.WHITE);
+                icono.setImageDrawable(tiene ? iconOscuro : iconBlanco);
+                tvTit.setTextColor(tiene ? 0xFF141519 : Color.WHITE);
+                tvSub.setTextColor(tiene ? 0x99141519 : 0x99FFFFFF);
             }
         });
 
@@ -560,8 +500,8 @@ public class MainActivity extends Activity {
             public void onClick(View v) { accion.run(); }
         });
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(152), dp(142));
-        lp.setMargins(dp(10), dp(8), dp(10), dp(8));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(146), dp(136));
+        lp.setMargins(dp(10), dp(6), dp(10), dp(6));
         card.setLayoutParams(lp);
         return card;
     }
@@ -575,7 +515,6 @@ public class MainActivity extends Activity {
             return;
         } catch (Exception ignored) {}
 
-        // Segundo intento mediante la app de TV de MediaTek pasándole el ID
         try {
             Intent i = pm.getLeanbackLaunchIntentForPackage(PAQUETE_TV);
             if (i == null) i = pm.getLaunchIntentForPackage(PAQUETE_TV);
@@ -590,7 +529,6 @@ public class MainActivity extends Activity {
     }
 
     private void abrirHdmiFallback(int puerto) {
-        // IDs estándar en televisores con SoC MediaTek (TCL, Xiaomi, Sony, Philips...)
         String[] posiblesIds = {
                 "com.mediatek.tvinput/.hdmi.HDMIInputService/HW" + (puerto + 4),
                 "com.mediatek.tvinput/.hdmi.HDMIInputService/HW" + puerto,
@@ -627,15 +565,15 @@ public class MainActivity extends Activity {
         col.setClipToPadding(false);
         col.setPadding(dp(10), dp(8), dp(10), dp(8));
 
-        int anchoTile = grid ? 148 : 146;
-        int altoTile = grid ? 83 : 82;
-        final int radio = dp(18);
+        int anchoTile = grid ? 156 : 162;
+        int altoTile = grid ? 88 : 92;
+        final int radio = dp(22);
 
         final FrameLayout caja = new FrameLayout(this);
         caja.setElevation(dp(6));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            caja.setOutlineAmbientShadowColor(0xCC000000);
-            caja.setOutlineSpotShadowColor(COLOR_GOLD_GLOW);
+            caja.setOutlineAmbientShadowColor(0x99000000);
+            caja.setOutlineSpotShadowColor(0xCC000000);
         }
         caja.setOutlineProvider(new ViewOutlineProvider() {
             @Override
@@ -648,7 +586,7 @@ public class MainActivity extends Activity {
         final ImageView iv = new ImageView(this);
         iv.setImageDrawable(tile);
         iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        iv.setAlpha(0.82f);
+        iv.setAlpha(0.92f);
         caja.addView(iv, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         col.addView(caja, new LinearLayout.LayoutParams(dp(anchoTile), dp(altoTile)));
@@ -657,8 +595,9 @@ public class MainActivity extends Activity {
         if (grid) {
             tvGrid = new TextView(this);
             tvGrid.setText(texto);
-            tvGrid.setTextColor(0xB3FFFFFF);
+            tvGrid.setTextColor(0x99FFFFFF);
             tvGrid.setTextSize(13);
+            tvGrid.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             tvGrid.setGravity(Gravity.CENTER);
             tvGrid.setSingleLine(true);
             LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(
@@ -669,36 +608,28 @@ public class MainActivity extends Activity {
             tvGrid = null;
         }
 
-        // Aro de selección en tono Dorado Champagne
         final GradientDrawable aro = new GradientDrawable();
         aro.setColor(Color.TRANSPARENT);
-        aro.setStroke(dp(2), COLOR_GOLD);
+        aro.setStroke(dp(3), Color.WHITE);
         aro.setCornerRadius(radio);
-
-        // Borde sutil en reposo
-        final GradientDrawable aroReposo = new GradientDrawable();
-        aroReposo.setColor(Color.TRANSPARENT);
-        aroReposo.setStroke(dp(1), 0x1AFFFFFF);
-        aroReposo.setCornerRadius(radio);
-        caja.setForeground(aroReposo);
 
         col.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean tiene) {
-                float escala = tiene ? (grid ? 1.10f : 1.15f) : 1f;
+                float escala = tiene ? (grid ? 1.12f : 1.16f) : 1f;
                 v.animate()
                         .scaleX(escala)
                         .scaleY(escala)
-                        .translationY(tiene && !grid ? dp(-4) : 0f)
-                        .translationZ(tiene ? dp(18) : 0f)
+                        .translationY(tiene && !grid ? dp(-6) : 0f)
+                        .translationZ(tiene ? dp(20) : 0f)
                         .setInterpolator(rebote)
-                        .setDuration(280)
+                        .setDuration(260)
                         .start();
-                iv.setAlpha(tiene ? 1f : 0.82f);
-                caja.setElevation(tiene ? dp(18) : dp(6));
-                caja.setForeground(tiene ? aro : aroReposo);
+                iv.setAlpha(tiene ? 1f : 0.92f);
+                caja.setElevation(tiene ? dp(22) : dp(6));
+                caja.setForeground(tiene ? aro : null);
                 if (tvGrid != null) {
-                    tvGrid.setTextColor(tiene ? COLOR_GOLD : 0xB3FFFFFF);
+                    tvGrid.setTextColor(tiene ? Color.WHITE : 0x99FFFFFF);
                 }
                 if (!grid && tiene) {
                     etiqueta.setText(texto);
@@ -740,7 +671,7 @@ public class MainActivity extends Activity {
         }
         overlay.setAlpha(0f);
         overlay.setVisibility(View.VISIBLE);
-        overlay.animate().alpha(1f).setDuration(220).start();
+        overlay.animate().alpha(1f).setDuration(200).start();
         etiqueta.setVisibility(View.GONE);
         dockScroll.setVisibility(View.GONE);
         overlay.scrollTo(0, 0);
@@ -885,76 +816,67 @@ public class MainActivity extends Activity {
         catch (PackageManager.NameNotFoundException e) { return pm.getDefaultActivityIcon(); }
     }
 
-    // Genera el fondo aesthetic oscuro con brillo cálido sutil para las tarjetas sin banner
-    private void pintarFondoTileAesthetic(Canvas c, int w, int hh) {
+    // Fondo gris neutro suave estilo Apple TV para tarjetas de sistema
+    private void pintarFondoTvOS(Canvas c, int w, int hh) {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setShader(new LinearGradient(0, 0, w, hh, 0xFF232631, 0xFF101218, Shader.TileMode.CLAMP));
+        p.setShader(new LinearGradient(0, 0, 0, hh, 0xFF3A3D45, 0xFF22242A, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, w, hh, p);
-
-        Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glow.setShader(new RadialGradient(w / 2f, hh / 2f, w * 0.55f,
-                0x24F3E5AB, 0x00000000, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, w, hh, glow);
     }
 
     private Drawable panel(Drawable icono) {
         int w = 320; int hh = 180;
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
-        pintarFondoTileAesthetic(c, w, hh);
-        int s = 88; int l = (w - s) / 2; int t = (hh - s) / 2;
+        pintarFondoTvOS(c, w, hh);
+        int s = 90; int l = (w - s) / 2; int t = (hh - s) / 2;
         icono.setBounds(l, t, l + s, t + s);
         icono.draw(c);
         return new BitmapDrawable(getResources(), b);
     }
 
-    // Nuevo Tile de Entradas HDMI dibujado vectorialmente en tono dorado
     private Drawable tileHdmi() {
         int w = 320; int hh = 180;
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
-        pintarFondoTileAesthetic(c, w, hh);
+        pintarFondoTvOS(c, w, hh);
 
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(COLOR_GOLD);
+        p.setColor(0xF2FFFFFF);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(5.5f);
         p.setStrokeJoin(Paint.Join.ROUND);
         p.setStrokeCap(Paint.Cap.ROUND);
 
-        // Silueta trapezoidal típica de conector HDMI
         float cx = w / 2f;
-        float cy = hh / 2f - 10;
+        float cy = hh / 2f - 8;
         Path path = new Path();
-        path.moveTo(cx - 44, cy - 18);
-        path.lineTo(cx + 44, cy - 18);
-        path.lineTo(cx + 44, cy + 4);
-        path.lineTo(cx + 30, cy + 18);
-        path.lineTo(cx - 30, cy + 18);
-        path.lineTo(cx - 44, cy + 4);
+        path.moveTo(cx - 42, cy - 16);
+        path.lineTo(cx + 42, cy - 16);
+        path.lineTo(cx + 42, cy + 4);
+        path.lineTo(cx + 28, cy + 17);
+        path.lineTo(cx - 28, cy + 17);
+        path.lineTo(cx - 42, cy + 4);
         path.close();
         c.drawPath(path, p);
 
-        // Pines centrales del puerto HDMI
         p.setStyle(Paint.Style.FILL);
-        c.drawRoundRect(cx - 24, cy - 3, cx + 24, cy + 3, 2, 2, p);
+        c.drawRoundRect(cx - 22, cy - 2, cx + 22, cy + 3, 2, 2, p);
 
-        // Etiqueta inferior "HDMI"
-        p.setTextSize(20f);
+        p.setTextSize(18f);
         p.setTextAlign(Paint.Align.CENTER);
-        p.setLetterSpacing(0.25f);
+        p.setLetterSpacing(0.18f);
         p.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-        c.drawText("HDMI", cx, cy + 48, p);
+        c.drawText("HDMI", cx, cy + 46, p);
 
         return new BitmapDrawable(getResources(), b);
     }
 
-    private Drawable dibujarIconoConector(boolean activo) {
+    private Drawable dibujarIconoConector(int color) {
         int w = 120; int hh = 76;
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(activo ? COLOR_GOLD : 0xCCFFFFFF);
+        p.setColor(color);
         p.setStyle(Paint.Style.STROKE);
         p.setStrokeWidth(4.5f);
         p.setStrokeJoin(Paint.Join.ROUND);
@@ -962,17 +884,17 @@ public class MainActivity extends Activity {
         float cx = w / 2f;
         float cy = hh / 2f;
         Path path = new Path();
-        path.moveTo(cx - 34, cy - 14);
-        path.lineTo(cx + 34, cy - 14);
-        path.lineTo(cx + 34, cy + 3);
-        path.lineTo(cx + 22, cy + 15);
-        path.lineTo(cx - 22, cy + 15);
-        path.lineTo(cx - 34, cy + 3);
+        path.moveTo(cx - 32, cy - 13);
+        path.lineTo(cx + 32, cy - 13);
+        path.lineTo(cx + 32, cy + 3);
+        path.lineTo(cx + 20, cy + 14);
+        path.lineTo(cx - 20, cy + 14);
+        path.lineTo(cx - 32, cy + 3);
         path.close();
         c.drawPath(path, p);
 
         p.setStyle(Paint.Style.FILL);
-        c.drawRoundRect(cx - 18, cy - 2, cx + 18, cy + 3, 2, 2, p);
+        c.drawRoundRect(cx - 16, cy - 2, cx + 16, cy + 3, 2, 2, p);
         return new BitmapDrawable(getResources(), b);
     }
 
@@ -980,15 +902,15 @@ public class MainActivity extends Activity {
         int w = 320; int hh = 180;
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
-        pintarFondoTileAesthetic(c, w, hh);
+        pintarFondoTvOS(c, w, hh);
 
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(COLOR_GOLD);
+        p.setColor(0xF2FFFFFF);
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 2; j++) {
                 float left = w / 2f - 46 + i * 34;
                 float top = hh / 2f - 22 + j * 28;
-                c.drawRoundRect(left, top, left + 24, top + 16, 5, 5, p);
+                c.drawRoundRect(left, top, left + 24, top + 16, 6, 6, p);
             }
         }
         return new BitmapDrawable(getResources(), b);
