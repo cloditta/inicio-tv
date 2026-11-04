@@ -118,6 +118,7 @@ public class MainActivity extends Activity {
     // Selector HDMI
     private FrameLayout overlayHdmi;
     private LinearLayout contenedorHdmi;
+    private LinearLayout tarjetaHdmi;
 
     private final Runnable rotar = new Runnable() {
         @Override
@@ -444,7 +445,6 @@ public class MainActivity extends Activity {
         scrollFavs.setHorizontalScrollBarEnabled(false);
         scrollFavs.setBackground(panel);
         scrollFavs.setPadding(dp(14), dp(16), dp(14), dp(16));
-        scrollFavs.setClipChildren(false);
         scrollFavs.setClipToPadding(false);
         scrollFavs.addView(filaFavs, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -460,13 +460,12 @@ public class MainActivity extends Activity {
         HorizontalScrollView scrollApps = new HorizontalScrollView(this);
         scrollApps.setHorizontalScrollBarEnabled(false);
         scrollApps.setPadding(dp(14), dp(16), dp(14), dp(16));
-        scrollApps.setClipChildren(false);
         scrollApps.setClipToPadding(false);
         scrollApps.addView(filaApps, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams appsLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        appsLp.topMargin = dp(14);
+        appsLp.topMargin = dp(28);
         columna.addView(scrollApps, appsLp);
 
         contenido = new ScrollView(this);
@@ -599,7 +598,7 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------
     private void aplicarGlow(int c) {
         int rgb = c & 0x00FFFFFF;
-        glowDrawable.setColors(new int[]{0xB3000000 | rgb, rgb});
+        glowDrawable.setColors(new int[]{0x80000000 | rgb, rgb});
     }
 
     private void cambiarGlow(int destino) {
@@ -648,7 +647,7 @@ public class MainActivity extends Activity {
             int c = Color.rgb(Math.round(r / peso), Math.round(g / peso), Math.round(bl / peso));
             Color.colorToHSV(c, hsv);
             hsv[1] = Math.min(1f, hsv[1] * 1.1f);
-            hsv[2] = Math.max(0.35f, Math.min(0.6f, hsv[2]));
+            hsv[2] = Math.max(0.3f, Math.min(0.5f, hsv[2]));
             return Color.HSVToColor(hsv) | 0xFF000000;
         } catch (Exception e) {
             return COLOR_NEUTRO;
@@ -694,6 +693,7 @@ public class MainActivity extends Activity {
         contenedorHdmi.setClipToPadding(false);
         tarjeta.addView(contenedorHdmi);
 
+        tarjetaHdmi = tarjeta;
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.CENTER);
@@ -763,6 +763,21 @@ public class MainActivity extends Activity {
                 }));
             }
         }
+
+        // Ancho fijo calculado: así ninguna tarjeta se sale ni se recorta
+        int n = contenedorHdmi.getChildCount();
+        int pantalla = getResources().getDisplayMetrics().widthPixels;
+        int disponible = pantalla - dp(96) - dp(88);
+        int ancho = Math.min(dp(146), disponible / n - dp(20));
+        for (int i = 0; i < n; i++) {
+            View c = contenedorHdmi.getChildAt(i);
+            ViewGroup.LayoutParams clp = c.getLayoutParams();
+            clp.width = ancho;
+            c.setLayoutParams(clp);
+        }
+        ViewGroup.LayoutParams tlp = tarjetaHdmi.getLayoutParams();
+        tlp.width = n * (ancho + dp(20)) + dp(88);
+        tarjetaHdmi.setLayoutParams(tlp);
 
         overlayHdmi.setAlpha(0f);
         overlayHdmi.setVisibility(View.VISIBLE);
