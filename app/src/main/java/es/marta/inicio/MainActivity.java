@@ -1,8 +1,6 @@
 package es.marta.inicio;
 
 import android.animation.ArgbEvaluator;
-import android.animation.ObjectAnimator;
-import android.animation.PropertyValuesHolder;
 import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
@@ -10,7 +8,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
@@ -37,11 +34,11 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.text.method.TransformationMethod;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.LinearInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -52,9 +49,7 @@ import android.widget.TextClock;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
@@ -65,11 +60,7 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
 
-    private static final long ROTAR_MS = 5 * 60 * 1000L; // 5 minutos
-
-    // Oscuridad que se pone sobre el fondo (0x00 = nada, 0xFF = negro total)
-    private static final int SCRIM = 0xC8000000;
-    private static final int COLOR_NEUTRO = 0xFF2E2F3A;
+    private static final int COLOR_NEUTRO = 0xFF283044;
 
     private static final String[][] FAVORITAS = {
             {"Netflix", "com.netflix.ninja"},
@@ -91,18 +82,11 @@ public class MainActivity extends Activity {
     private final DecelerateInterpolator suave = new DecelerateInterpolator(1.5f);
 
     private FrameLayout root;
-    private ImageView bgA;
-    private ImageView bgB;
-    private final ObjectAnimator[] zoom = new ObjectAnimator[2];
-    private boolean frenteEsA = true;
-    private boolean hayFondo = false;
-    private int indiceFondo = 0;
-    private int indicePaisaje = 0;
 
     // Brillo de color que cambia según la app seleccionada
     private View glow;
     private GradientDrawable glowDrawable;
-    private int glowActual = 0xFF4A1414;
+    private int glowActual = COLOR_NEUTRO;
     private ValueAnimator glowAnim;
 
     // Pantalla principal
@@ -120,14 +104,6 @@ public class MainActivity extends Activity {
     private LinearLayout contenedorHdmi;
     private LinearLayout tarjetaHdmi;
 
-    private final Runnable rotar = new Runnable() {
-        @Override
-        public void run() {
-            siguienteFondo();
-            h.postDelayed(this, ROTAR_MS);
-        }
-    };
-
     private final Runnable refrescarSaludo = new Runnable() {
         @Override
         public void run() {
@@ -136,7 +112,7 @@ public class MainActivity extends Activity {
         }
     };
 
-    /** Pasa el texto a mayúsculas (para la fecha, como en las capturas). */
+    /** Pasa el texto a mayúsculas (para la fecha). */
     private static class Mayusculas implements TransformationMethod {
         @Override
         public CharSequence getTransformation(CharSequence source, View view) {
@@ -155,26 +131,28 @@ public class MainActivity extends Activity {
         pm = getPackageManager();
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(Color.BLACK);
 
-        bgA = vistaFondo();
-        bgB = vistaFondo();
-        bgB.setAlpha(0f);
-        root.addView(bgA);
-        root.addView(bgB);
+        // Fondo degradado sólido y elegante (sin paisajes ni fotos)
+        GradientDrawable fondoBase = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFF171B26, 0xFF0E1118, 0xFF07080C});
+        root.setBackground(fondoBase);
 
-        // Oscurece el fondo para que parezca el estilo de las capturas
-        View scrim = new View(this);
-        scrim.setBackgroundColor(SCRIM);
-        root.addView(scrim, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        // Luz ambiental superior sutil para dar profundidad al degradado
+        GradientDrawable luzSuperior = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{0x18FFFFFF, 0x00000000});
+        View capaLuz = new View(this);
+        capaLuz.setBackground(luzSuperior);
+        root.addView(capaLuz, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(320), Gravity.TOP));
 
-        // Brillo radial de color detrás del contenido
+        // Brillo radial de color detrás del contenido que reacciona a la app seleccionada
         glowDrawable = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{0, 0});
         glowDrawable.setGradientType(GradientDrawable.RADIAL_GRADIENT);
-        glowDrawable.setGradientRadius(dp(640));
-        glowDrawable.setGradientCenter(0.3f, 0.55f);
+        glowDrawable.setGradientRadius(dp(580));
+        glowDrawable.setGradientCenter(0.32f, 0.52f);
         aplicarGlow(glowActual);
         glow = new View(this);
         glow.setBackground(glowDrawable);
@@ -203,18 +181,12 @@ public class MainActivity extends Activity {
         construirContenido();
         tvRed.setText(nombreRed());
 
-        h.removeCallbacks(rotar);
         h.removeCallbacks(refrescarSaludo);
-        if (!hayFondo) {
-            siguienteFondo();
-        }
-        h.postDelayed(rotar, ROTAR_MS);
         h.post(refrescarSaludo);
     }
 
     @Override
     protected void onPause() {
-        h.removeCallbacks(rotar);
         h.removeCallbacks(refrescarSaludo);
         super.onPause();
     }
@@ -222,10 +194,33 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        // Si el sistema lanza el intent por pulsar el botón INPUT del mando
+        if (intent != null && "com.android.tv.action.VIEW_INPUTS".equals(intent.getAction())) {
+            mostrarSelectorHdmi();
+            return;
+        }
         cerrarHdmi();
         contenido.scrollTo(0, 0);
         scrollFavs.scrollTo(0, 0);
         if (filaFavs.getChildCount() > 0) filaFavs.getChildAt(0).requestFocus();
+    }
+
+    /** Intercepta el botón INPUT / SOURCE físico del mando de la TV. */
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_TV_INPUT
+                || keyCode == KeyEvent.KEYCODE_AVR_INPUT
+                || keyCode == KeyEvent.KEYCODE_STB_INPUT
+                || keyCode == KeyEvent.KEYCODE_TV_ANTENNA_CABLE
+                || keyCode == 178 /* KEYCODE_TV_INPUT estándar */) {
+            if (overlayHdmi != null && overlayHdmi.getVisibility() == View.VISIBLE) {
+                cerrarHdmi();
+            } else {
+                mostrarSelectorHdmi();
+            }
+            return true;
+        }
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override
@@ -244,9 +239,9 @@ public class MainActivity extends Activity {
 
         saludo = new TextView(this);
         saludo.setText(saludoActual());
-        saludo.setTextColor(0xB3FFFFFF);
-        saludo.setTextSize(12);
-        saludo.setLetterSpacing(0.2f);
+        saludo.setTextColor(0x99FFFFFF);
+        saludo.setTextSize(11);
+        saludo.setLetterSpacing(0.22f);
         saludo.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         cab.addView(saludo);
 
@@ -258,7 +253,7 @@ public class MainActivity extends Activity {
         reloj.setFormat24Hour("HH:mm");
         reloj.setFormat12Hour("HH:mm");
         reloj.setTextColor(Color.WHITE);
-        reloj.setTextSize(54);
+        reloj.setTextSize(48);
         reloj.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         reloj.setIncludeFontPadding(false);
         reloj.setShadowLayer(12, 0, 3, 0x66000000);
@@ -266,8 +261,8 @@ public class MainActivity extends Activity {
 
         View separador = new View(this);
         separador.setBackgroundColor(0x33FFFFFF);
-        LinearLayout.LayoutParams sepLp = new LinearLayout.LayoutParams(dp(1), dp(34));
-        sepLp.setMargins(dp(18), 0, dp(18), 0);
+        LinearLayout.LayoutParams sepLp = new LinearLayout.LayoutParams(dp(1), dp(30));
+        sepLp.setMargins(dp(16), 0, dp(16), 0);
         fila.addView(separador, sepLp);
 
         TextClock fecha = new TextClock(this);
@@ -275,7 +270,7 @@ public class MainActivity extends Activity {
         fecha.setFormat12Hour("EEEE  d MMMM");
         fecha.setTransformationMethod(new Mayusculas());
         fecha.setTextColor(0xB3FFFFFF);
-        fecha.setTextSize(15);
+        fecha.setTextSize(14);
         fecha.setLetterSpacing(0.12f);
         fecha.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         fila.addView(fecha);
@@ -285,7 +280,7 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP | Gravity.START);
-        lp.setMargins(dp(48), dp(26), 0, 0);
+        lp.setMargins(dp(48), dp(28), 0, 0);
         principal.addView(cab, lp);
     }
 
@@ -336,16 +331,16 @@ public class MainActivity extends Activity {
         p.setGravity(Gravity.CENTER_VERTICAL);
         p.setFocusable(true);
         p.setClickable(true);
-        p.setPadding(dp(18), dp(10), dp(20), dp(10));
+        p.setPadding(dp(16), dp(9), dp(18), dp(9));
 
         final GradientDrawable normal = new GradientDrawable();
-        normal.setColor(0x66000000);
-        normal.setCornerRadius(dp(28));
-        normal.setStroke(dp(1), 0x33FFFFFF);
+        normal.setColor(0x33FFFFFF);
+        normal.setCornerRadius(dp(26));
+        normal.setStroke(dp(1), 0x28FFFFFF);
 
         final GradientDrawable foco = new GradientDrawable();
         foco.setColor(0xF2FFFFFF);
-        foco.setCornerRadius(dp(28));
+        foco.setCornerRadius(dp(26));
 
         p.setBackground(normal);
 
@@ -354,16 +349,16 @@ public class MainActivity extends Activity {
 
         final ImageView iv = new ImageView(this);
         iv.setImageDrawable(iconoBlanco);
-        int iw = tipoIcono == 0 ? 24 : 20;
-        int ih = tipoIcono == 0 ? 15 : 20;
+        int iw = tipoIcono == 0 ? 22 : 18;
+        int ih = tipoIcono == 0 ? 14 : 18;
         LinearLayout.LayoutParams ivLp = new LinearLayout.LayoutParams(dp(iw), dp(ih));
-        ivLp.rightMargin = dp(10);
+        ivLp.rightMargin = dp(9);
         p.addView(iv, ivLp);
 
         final TextView tv = new TextView(this);
         tv.setText(texto);
         tv.setTextColor(Color.WHITE);
-        tv.setTextSize(14);
+        tv.setTextSize(13);
         tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         tv.setSingleLine(true);
         p.addView(tv);
@@ -385,7 +380,7 @@ public class MainActivity extends Activity {
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.leftMargin = dp(12);
+        lp.leftMargin = dp(10);
         p.setLayoutParams(lp);
         return p;
     }
@@ -405,7 +400,6 @@ public class MainActivity extends Activity {
             if (ni.getType() == ConnectivityManager.TYPE_WIFI) return "Wi-Fi";
             return ni.getTypeName();
         } catch (Exception e) {
-            // Sin el permiso ACCESS_NETWORK_STATE no se puede leer el estado
             return "Red";
         }
     }
@@ -418,23 +412,23 @@ public class MainActivity extends Activity {
         columna.setOrientation(LinearLayout.VERTICAL);
         columna.setClipChildren(false);
         columna.setClipToPadding(false);
-        columna.setPadding(dp(48), 0, dp(48), dp(40));
+        columna.setPadding(dp(48), 0, dp(48), dp(36));
 
         titulo = new TextView(this);
         titulo.setTextColor(Color.WHITE);
-        titulo.setTextSize(40);
+        titulo.setTextSize(32);
         titulo.setTypeface(Typeface.create("sans-serif-light", Typeface.NORMAL));
         titulo.setSingleLine(true);
         titulo.setShadowLayer(10, 0, 3, 0x66000000);
-        titulo.setPadding(dp(12), 0, 0, dp(12));
+        titulo.setPadding(dp(10), 0, 0, dp(10));
         columna.addView(titulo, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // Fila 1: favoritas dentro de un panel oscuro redondeado
+        // Fila 1: favoritas dentro de un panel translúcido redondeado
         GradientDrawable panel = new GradientDrawable();
-        panel.setColor(0xF2131417);
-        panel.setCornerRadius(dp(24));
-        panel.setStroke(dp(1), 0x1FFFFFFF);
+        panel.setColor(0x660A0C12);
+        panel.setCornerRadius(dp(22));
+        panel.setStroke(dp(1), 0x22FFFFFF);
 
         filaFavs = new LinearLayout(this);
         filaFavs.setOrientation(LinearLayout.HORIZONTAL);
@@ -444,7 +438,7 @@ public class MainActivity extends Activity {
         scrollFavs = new HorizontalScrollView(this);
         scrollFavs.setHorizontalScrollBarEnabled(false);
         scrollFavs.setBackground(panel);
-        scrollFavs.setPadding(dp(14), dp(16), dp(14), dp(16));
+        scrollFavs.setPadding(dp(12), dp(14), dp(12), dp(14));
         scrollFavs.setClipToPadding(false);
         scrollFavs.addView(filaFavs, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -459,26 +453,26 @@ public class MainActivity extends Activity {
 
         HorizontalScrollView scrollApps = new HorizontalScrollView(this);
         scrollApps.setHorizontalScrollBarEnabled(false);
-        scrollApps.setPadding(dp(14), dp(16), dp(14), dp(16));
+        scrollApps.setPadding(dp(12), dp(12), dp(12), dp(14));
         scrollApps.setClipToPadding(false);
         scrollApps.addView(filaApps, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams appsLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        appsLp.topMargin = dp(28);
+        appsLp.topMargin = dp(20);
         columna.addView(scrollApps, appsLp);
 
         contenido = new ScrollView(this);
         contenido.setVerticalScrollBarEnabled(false);
         contenido.setClipChildren(false);
         contenido.setClipToPadding(false);
-        contenido.setPadding(0, dp(10), 0, 0);
+        contenido.setPadding(0, dp(8), 0, 0);
         contenido.addView(columna, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-        lp.topMargin = dp(190);
+        lp.topMargin = dp(170);
         principal.addView(contenido, lp);
     }
 
@@ -535,9 +529,9 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Tarjeta de app: rectángulo redondeado con el banner, se agranda al enfocar. */
+    /** Tarjeta de app más compacta (156x88 dp) con esquinas redondeadas. */
     private View tarjeta(final String nombre, Drawable tile, final Runnable accion) {
-        final int radio = dp(16);
+        final int radio = dp(14);
         final int color = colorDe(tile);
 
         final FrameLayout caja = new FrameLayout(this);
@@ -559,22 +553,22 @@ public class MainActivity extends Activity {
         final ImageView iv = new ImageView(this);
         iv.setImageDrawable(tile);
         iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        iv.setAlpha(0.9f);
+        iv.setAlpha(0.88f);
         caja.addView(iv, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         final GradientDrawable aro = new GradientDrawable();
         aro.setColor(Color.TRANSPARENT);
-        aro.setStroke(dp(3), Color.WHITE);
+        aro.setStroke(dp(2), Color.WHITE);
         aro.setCornerRadius(radio);
 
         caja.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean tiene) {
-                float s = tiene ? 1.1f : 1f;
-                v.animate().scaleX(s).scaleY(s).translationZ(tiene ? dp(18) : 0f)
-                        .setInterpolator(rebote).setDuration(240).start();
-                iv.setAlpha(tiene ? 1f : 0.9f);
+                float s = tiene ? 1.10f : 1f;
+                v.animate().scaleX(s).scaleY(s).translationZ(tiene ? dp(16) : 0f)
+                        .setInterpolator(rebote).setDuration(220).start();
+                iv.setAlpha(tiene ? 1f : 0.88f);
                 caja.setForeground(tiene ? aro : null);
                 if (tiene) {
                     titulo.setText(nombre);
@@ -587,8 +581,9 @@ public class MainActivity extends Activity {
             public void onClick(View v) { accion.run(); }
         });
 
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(200), dp(112));
-        lp.setMargins(dp(6), 0, dp(6), 0);
+        // Tamaño reducido: 156x88 dp (en lugar de 200x112 dp)
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(156), dp(88));
+        lp.setMargins(dp(5), 0, dp(5), 0);
         caja.setLayoutParams(lp);
         return caja;
     }
@@ -598,13 +593,13 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------
     private void aplicarGlow(int c) {
         int rgb = c & 0x00FFFFFF;
-        glowDrawable.setColors(new int[]{0x80000000 | rgb, rgb});
+        glowDrawable.setColors(new int[]{0x75000000 | rgb, 0x00000000 | rgb});
     }
 
     private void cambiarGlow(int destino) {
         if (glowAnim != null) glowAnim.cancel();
         glowAnim = ValueAnimator.ofObject(new ArgbEvaluator(), glowActual, destino);
-        glowAnim.setDuration(450);
+        glowAnim.setDuration(420);
         glowAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator a) {
@@ -647,7 +642,7 @@ public class MainActivity extends Activity {
             int c = Color.rgb(Math.round(r / peso), Math.round(g / peso), Math.round(bl / peso));
             Color.colorToHSV(c, hsv);
             hsv[1] = Math.min(1f, hsv[1] * 1.1f);
-            hsv[2] = Math.max(0.3f, Math.min(0.5f, hsv[2]));
+            hsv[2] = Math.max(0.28f, Math.min(0.46f, hsv[2]));
             return Color.HSVToColor(hsv) | 0xFF000000;
         } catch (Exception e) {
             return COLOR_NEUTRO;
@@ -764,7 +759,6 @@ public class MainActivity extends Activity {
             }
         }
 
-        // Ancho fijo calculado: así ninguna tarjeta se sale ni se recorta
         int n = contenedorHdmi.getChildCount();
         int pantalla = getResources().getDisplayMetrics().widthPixels;
         int disponible = pantalla - dp(96) - dp(88);
@@ -909,7 +903,7 @@ public class MainActivity extends Activity {
     }
 
     // ------------------------------------------------------------------
-    // LANZAR APPS
+    // LANZAR APPS Y ANTENA TV
     // ------------------------------------------------------------------
     private boolean instalada(String pkg) {
         try { pm.getApplicationInfo(pkg, 0); return true; }
@@ -923,104 +917,52 @@ public class MainActivity extends Activity {
         startSeguro(i);
     }
 
+    /** Fuerza la entrada de sintonizador/antena TDT para que no salte al último HDMI usado. */
     private void abrirTv() {
+        // 1. Buscar el input del sintonizador (TYPE_TUNER) real de la TV y abrir sus canales
+        try {
+            TvInputManager tim = (TvInputManager) getSystemService(Context.TV_INPUT_SERVICE);
+            if (tim != null) {
+                for (TvInputInfo info : tim.getTvInputList()) {
+                    if (info.getType() == TvInputInfo.TYPE_TUNER) {
+                        Uri uri = TvContract.buildChannelsUriForInput(info.getId());
+                        Intent i = new Intent(Intent.ACTION_VIEW, uri);
+                        i.setPackage(PAQUETE_TV);
+                        i.putExtra(TvInputInfo.EXTRA_INPUT_ID, info.getId());
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(i);
+                        return;
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // 2. Lanzar la URI general de canales TDT forzando el paquete de TV de MediaTek
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, TvContract.Channels.CONTENT_URI);
+            i.setPackage(PAQUETE_TV);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+            return;
+        } catch (Exception ignored) {}
+
+        // 3. Fallback general a la URI de canales del sistema
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, TvContract.Channels.CONTENT_URI);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(i);
+            return;
+        } catch (Exception ignored) {}
+
+        // 4. Último recurso: abrir la app de TV normalmente
         Intent i = pm.getLeanbackLaunchIntentForPackage(PAQUETE_TV);
         if (i == null) i = pm.getLaunchIntentForPackage(PAQUETE_TV);
-        if (i == null) i = new Intent(Intent.ACTION_VIEW, TvContract.Channels.CONTENT_URI);
-        startSeguro(i);
+        if (i != null) startSeguro(i);
     }
 
     private void startSeguro(Intent i) {
         try { i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); startActivity(i); }
         catch (Exception e) { Toast.makeText(this, "No se pudo abrir", Toast.LENGTH_SHORT).show(); }
-    }
-
-    // ------------------------------------------------------------------
-    // FONDOS ROTATIVOS
-    // ------------------------------------------------------------------
-    private ImageView vistaFondo() {
-        ImageView iv = new ImageView(this);
-        iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        iv.setLayoutParams(new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        return iv;
-    }
-
-    private void siguienteFondo() {
-        File dir = getExternalFilesDir("fondos");
-        File[] fotos = null;
-        if (dir != null) {
-            fotos = dir.listFiles(new java.io.FilenameFilter() {
-                @Override
-                public boolean accept(File d, String n) {
-                    String s = n.toLowerCase();
-                    return s.endsWith(".jpg") || s.endsWith(".jpeg") || s.endsWith(".png");
-                }
-            });
-        }
-        if (fotos == null || fotos.length == 0) {
-            final int estilo = indicePaisaje++ % Paisaje.ESTILOS;
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    final Bitmap b = Paisaje.crear(1280, 720, estilo, System.nanoTime());
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() { mostrar(new BitmapDrawable(getResources(), b)); }
-                    });
-                }
-            }).start();
-            return;
-        }
-        Arrays.sort(fotos);
-        final File f = fotos[indiceFondo++ % fotos.length];
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                final Bitmap b = cargar(f);
-                if (b != null) {
-                    runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() { mostrar(new BitmapDrawable(getResources(), b)); }
-                    });
-                }
-            }
-        }).start();
-    }
-
-    private Bitmap cargar(File f) {
-        BitmapFactory.Options o = new BitmapFactory.Options();
-        o.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(f.getPath(), o);
-        int s = 1;
-        while (o.outWidth / (s * 2) >= 1920 && o.outHeight / (s * 2) >= 1080) s *= 2;
-        o.inJustDecodeBounds = false;
-        o.inSampleSize = s;
-        o.inPreferredConfig = Bitmap.Config.RGB_565;
-        return BitmapFactory.decodeFile(f.getPath(), o);
-    }
-
-    private void mostrar(Drawable d) {
-        hayFondo = true;
-        ImageView frente = frenteEsA ? bgA : bgB;
-        ImageView atras = frenteEsA ? bgB : bgA;
-        int idx = frenteEsA ? 1 : 0;
-        if (zoom[idx] != null) zoom[idx].cancel();
-
-        atras.setScaleX(1f);
-        atras.setScaleY(1f);
-        atras.setImageDrawable(d);
-        atras.animate().alpha(1f).setDuration(1500).start();
-        frente.animate().alpha(0f).setDuration(1500).start();
-
-        ObjectAnimator z = ObjectAnimator.ofPropertyValuesHolder(atras,
-                PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.07f),
-                PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.07f));
-        z.setDuration(ROTAR_MS + 3000);
-        z.setInterpolator(new LinearInterpolator());
-        z.start();
-        zoom[idx] = z;
-        frenteEsA = !frenteEsA;
     }
 
     // ------------------------------------------------------------------
@@ -1057,7 +999,7 @@ public class MainActivity extends Activity {
         Bitmap b = Bitmap.createBitmap(w, hh, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         pintarFondoTvOS(c, w, hh);
-        int s = 90; int l = (w - s) / 2; int t = (hh - s) / 2;
+        int s = 88; int l = (w - s) / 2; int t = (hh - s) / 2;
         icono.setBounds(l, t, l + s, t + s);
         icono.draw(c);
         return new BitmapDrawable(getResources(), b);
